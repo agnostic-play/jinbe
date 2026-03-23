@@ -1,6 +1,6 @@
 module github.com/agnostic-play/jinbe
 
-go 1.23.9
+go 1.25.1
 
 require (
 	github.com/gojek/heimdall/v7 v7.0.3
