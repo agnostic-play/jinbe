@@ -1,11 +1,11 @@
 package cache_manager
 
-import `sync`
+import "sync"
 
-// sync.Pool provides a pool of reusable objects to reduce allocations and improve performance.
+// objectPool reduces allocations by reusing cacheItem instances.
 var objectPool = sync.Pool{New: func() any { return new(cacheItem) }}
 
-func getEntryToObjectPool() *cacheItem {
+func getEntryFromObjectPool() *cacheItem {
 	return objectPool.Get().(*cacheItem)
 }
 

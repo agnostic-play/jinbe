@@ -9,6 +9,9 @@ import (
 )
 
 func MaskStruct(target any) (any, error) {
+	if target == nil {
+		return nil, nil
+	}
 	maskedStruct, err := masker.Mask(target)
 	if err != nil {
 		return target, err
@@ -27,6 +30,9 @@ func MaskJSON(target []byte) (any, error) {
 }
 
 func ShouldMaskStruct(target any) any {
+	if target == nil {
+		return nil
+	}
 	maskedStruct, err := masker.Mask(target)
 	if err != nil {
 		return target
@@ -50,6 +56,9 @@ func ShouldMaskJSON(target []byte) any {
 }
 
 func ShouldMaskStructWithLogger(ctx context.Context, log logger.PublicLoggerWithoutParamsFn, target any) any {
+	if target == nil {
+		return nil
+	}
 	maskedStruct, err := masker.Mask(target)
 	if err != nil {
 		log(ctx, fmt.Sprintf("failed to mask: %s", err.Error()))
@@ -61,7 +70,7 @@ func ShouldMaskStructWithLogger(ctx context.Context, log logger.PublicLoggerWith
 
 func ShouldMaskJSONWithLogger(ctx context.Context, log logger.PublicLoggerWithoutParamsFn, target []byte) any {
 	var targetJson any
-	if err := json.Unmarshal([]byte(target), &targetJson); err != nil {
+	if err := json.Unmarshal(target, &targetJson); err != nil {
 		log(ctx, fmt.Sprintf("failed to mask: %s", err.Error()))
 		return target
 	}
@@ -69,7 +78,7 @@ func ShouldMaskJSONWithLogger(ctx context.Context, log logger.PublicLoggerWithou
 	maskedStruct, err := masker.Mask(targetJson)
 	if err != nil {
 		log(ctx, fmt.Sprintf("failed to mask: %s", err.Error()))
-		return nil
+		return targetJson // return original parsed value, not nil
 	}
 
 	return maskedStruct

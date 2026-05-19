@@ -93,6 +93,9 @@ func (c Config) WithDefaults() Config {
 	if c.RetryBackoff <= 0 {
 		c.RetryBackoff = def.RetryBackoff
 	}
+	if c.MaxRetryBackoff <= 0 {
+		c.MaxRetryBackoff = def.MaxRetryBackoff
+	}
 
 	// If entries never become stale, disable periodic refresh explicitly.
 	if c.StaleInSec <= 0 {

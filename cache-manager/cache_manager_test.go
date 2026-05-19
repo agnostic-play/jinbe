@@ -101,7 +101,7 @@ func TestCacheManager_ComprehensiveFlow(t *testing.T) {
 	}
 
 	mockFetcher := NewMockFetcher()
-	cm := NewCacheManager(cfg, func(ctx context.Context, identifier, msg string) {
+	cm := NewCacheManager(cfg, func(ctx context.Context, identifier, msg string, objects ...any) {
 		t.Logf("%s", msg)
 	})
 	defer cm.Stop()
@@ -192,8 +192,8 @@ func TestCacheManager_LargeDatasetEviction(t *testing.T) {
 	}
 
 	mockFetcher := NewMockFetcher()
-	cm := NewCacheManager(cfg, func(ctx context.Context, identifer, msg string) {
-		t.Logf(msg)
+	cm := NewCacheManager(cfg, func(ctx context.Context, identifier, msg string, objects ...any) {
+		t.Logf("%s", msg)
 	})
 	defer cm.Stop()
 
@@ -294,8 +294,8 @@ func TestCacheManager_EdgeCases(t *testing.T) {
 	}
 
 	mockFetcher := NewMockFetcher()
-	cm := NewCacheManager(cfg, func(ctx context.Context, identifier, msg string) {
-		t.Logf(msg)
+	cm := NewCacheManager(cfg, func(ctx context.Context, identifier, msg string, objects ...any) {
+		t.Logf("%s", msg)
 	})
 	defer cm.Stop()
 
@@ -367,8 +367,8 @@ func TestCacheManager_EdgeCases(t *testing.T) {
 // Helper function to create a simple cache manager for testing
 func createTestCacheManager(t *testing.T, cfg Config) (*cacheManager, *MockFetcher) {
 	mockFetcher := NewMockFetcher()
-	cm := NewCacheManager(cfg, func(ctx context.Context, identifier, msg string) {
-		t.Logf(msg)
+	cm := NewCacheManager(cfg, func(ctx context.Context, identifier, msg string, objects ...any) {
+		t.Logf("%s", msg)
 	})
 	return cm.(*cacheManager), mockFetcher
 }
@@ -377,7 +377,7 @@ func createTestCacheManager(t *testing.T, cfg Config) (*cacheManager, *MockFetch
 func BenchmarkCacheManager_SetGet(b *testing.B) {
 	cfg := DefaultConfig()
 	cfg.CacheCapacity = 1000
-	cfg.RefreshPeriod = -1 // Disable auto refresh for benchmark
+	cfg.StaleInSec = 0 // disable background refresh for benchmark
 
 	mockFetcher := NewMockFetcher()
 	cm := NewCacheManager(cfg, nil)
@@ -385,8 +385,7 @@ func BenchmarkCacheManager_SetGet(b *testing.B) {
 
 	ctx := context.Background()
 
-	// Pre-populate some data
-	for i := 0; i < 100; i++ {
+	for i := range 100 {
 		key := fmt.Sprintf("bench_key_%d", i)
 		value := fmt.Sprintf("bench_value_%d", i)
 		mockFetcher.SetData(key, value)

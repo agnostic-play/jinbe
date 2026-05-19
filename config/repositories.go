@@ -1,12 +1,11 @@
 package config
 
 import (
-	`context`
-	`encoding/json`
-	`errors`
-	`fmt`
+	"context"
+	"errors"
+	"fmt"
 
-	`gorm.io/gorm`
+	"gorm.io/gorm"
 )
 
 type Repositories interface {
@@ -31,7 +30,7 @@ func (d *repoConfig) GetConfigEntity(ctx context.Context, configID string) (Conf
 	if err := d.db.WithContext(ctx).
 		Table(aegConfigTable).
 		Model(ConfitEnt{}).
-		Where("config_id", configID).
+		Where("config_id = ?", configID).
 		First(&config).Error; err != nil {
 
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -53,7 +52,7 @@ func (d *repoConfig) CreateOrUpdate(ctx context.Context, configID string, config
 	if err := d.db.WithContext(ctx).
 		Table(aegConfigTable).
 		Model(ConfitEnt{}).
-		Where("config_id", configID).
+		Where("config_id = ?", configID).
 		First(&conf).Error; err != nil {
 
 		if !errors.Is(err, gorm.ErrRecordNotFound) {
@@ -63,39 +62,26 @@ func (d *repoConfig) CreateOrUpdate(ctx context.Context, configID string, config
 		isNewConfig = true
 	}
 
-	configJSON, err := json.Marshal(configVal)
-	if err != nil {
-		return ConfitEnt{}, err
-	}
-
 	conf.ConfigID = configID
-	conf.RawValue = string(configJSON)
+	conf.RawValue = configVal.RawValue
 
-	// Create config if not exist
 	if isNewConfig {
 		if err := d.db.WithContext(ctx).
 			Table(aegConfigTable).
 			Model(ConfitEnt{}).
 			Create(&conf).Error; err != nil {
-
-			if !errors.Is(err, gorm.ErrRecordNotFound) {
-				return ConfitEnt{}, err
-			}
+			return ConfitEnt{}, err
 		}
 
 		return conf, nil
 	}
 
-	// Update config if exist
 	if err := d.db.WithContext(ctx).
 		Table(aegConfigTable).
 		Model(ConfitEnt{}).
-		Where("config_id", configID).
+		Where("config_id = ?", configID).
 		Save(&conf).Error; err != nil {
-
-		if !errors.Is(err, gorm.ErrRecordNotFound) {
-			return ConfitEnt{}, err
-		}
+		return ConfitEnt{}, err
 	}
 
 	return conf, nil
@@ -105,7 +91,7 @@ func (d *repoConfig) Delete(ctx context.Context, configID string) error {
 	if err := d.db.WithContext(ctx).
 		Table(aegConfigTable).
 		Model(ConfitEnt{}).
-		Where("config_id", configID).
+		Where("config_id = ?", configID).
 		Delete(&ConfitEnt{}).Error; err != nil {
 
 		if !errors.Is(err, gorm.ErrRecordNotFound) {

@@ -1,8 +1,9 @@
 package cache_manager
 
 import (
+	"cmp"
 	"math"
-	"sort"
+	"slices"
 	"time"
 )
 
@@ -28,16 +29,12 @@ func (cm *cacheManager) evictIfNeededLocked() {
 		return
 	}
 
-	// Collect eviction candidates
 	candidates := cm.collectEvictionCandidates(plan.triggerSize)
 	if len(candidates) < plan.triggerSize {
 		return
 	}
 
-	// Determine exact number of items to evict
 	evictCount := cm.boundEvictCount(plan, len(candidates))
-
-	// Perform eviction
 	cm.removeLeastRecentlyUsed(candidates, evictCount)
 }
 
@@ -63,15 +60,14 @@ func (cm *cacheManager) computeEvictionPlan() *evictionPlan {
 		return nil
 	}
 
-	// Base eviction policy
 	var evictCount int
 	switch {
 	case capacity <= 10:
 		evictCount = 1
 	case capacity <= 50:
-		evictCount = int(math.Max(1, math.Min(2, float64(capacity)*0.1)))
+		evictCount = max(1, min(2, int(float64(capacity)*0.1)))
 	default:
-		evictCount = int(math.Max(1, float64(size)*0.05))
+		evictCount = max(1, int(float64(size)*0.05))
 	}
 
 	return &evictionPlan{
@@ -82,7 +78,7 @@ func (cm *cacheManager) computeEvictionPlan() *evictionPlan {
 	}
 }
 
-// collectEvictionCandidates returns non-expired entries for eviction consideration.
+// collectEvictionCandidates returns non-expired entries sorted by last access (LRU first).
 func (cm *cacheManager) collectEvictionCandidates(triggerSize int) []entryMeta {
 	now := time.Now().UnixNano()
 	candidates := make([]entryMeta, 0, triggerSize)
@@ -97,9 +93,8 @@ func (cm *cacheManager) collectEvictionCandidates(triggerSize int) []entryMeta {
 		})
 	}
 
-	// Sort by last access time → least recently used first.
-	sort.Slice(candidates, func(i, j int) bool {
-		return candidates[i].lastAccess < candidates[j].lastAccess
+	slices.SortFunc(candidates, func(a, b entryMeta) int {
+		return cmp.Compare(a.lastAccess, b.lastAccess)
 	})
 
 	return candidates
@@ -107,39 +102,24 @@ func (cm *cacheManager) collectEvictionCandidates(triggerSize int) []entryMeta {
 
 // boundEvictCount ensures eviction count stays within safe limits.
 func (cm *cacheManager) boundEvictCount(plan *evictionPlan, candidateCount int) int {
-	count := plan.evictCount
+	count := max(1, min(plan.evictCount, candidateCount))
 
-	if count < 1 {
-		count = 1
-	}
-	if count > candidateCount {
-		count = candidateCount
-	}
-
-	// For larger caches, enforce min/max bounds
 	if plan.capacity > 50 {
-		minCount := int(math.Max(1, math.Min(10, float64(plan.capacity)*0.02)))
-		if count < minCount {
-			count = minCount
-			if count > candidateCount {
-				count = candidateCount
-			}
-		}
-		maxCount := int(math.Max(1, float64(candidateCount)*0.10))
-		if count > maxCount {
-			count = maxCount
-		}
+		minCount := max(1, min(10, int(float64(plan.capacity)*0.02)))
+		count = min(max(count, minCount), candidateCount)
+		maxCount := max(1, int(float64(candidateCount)*0.10))
+		count = min(count, maxCount)
 	}
 
 	return count
 }
 
-// removeLeastRecentlyUsed deletes the first N candidates.
+// removeLeastRecentlyUsed deletes the first n candidates (already sorted LRU first).
 func (cm *cacheManager) removeLeastRecentlyUsed(candidates []entryMeta, n int) {
-	for i := 0; i < n && i < len(candidates); i++ {
+	for i := range min(n, len(candidates)) {
 		if entry, ok := cm.data[candidates[i].key]; ok {
 			delete(cm.data, candidates[i].key)
-			objectPool.Put(entry)
+			putEntryToObjectPool(entry)
 		}
 	}
 }

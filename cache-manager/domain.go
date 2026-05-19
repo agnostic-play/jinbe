@@ -1,9 +1,9 @@
 package cache_manager
 
 import (
-	`context`
-	`fmt`
-	`sync/atomic`
+	"context"
+	"fmt"
+	"sync/atomic"
 )
 
 type cacheItem struct {
@@ -28,8 +28,8 @@ func (e *cacheItem) setFetcher(fn FetcherFn) {
 		e.fetcherFn = func(ctx context.Context, key string) (any, error) {
 			return nil, fmt.Errorf(`no fetcher for key "%s"`, key)
 		}
+		return
 	}
-
 	e.fetcherFn = fn
 }
 

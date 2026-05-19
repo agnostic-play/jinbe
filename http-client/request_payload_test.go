@@ -154,12 +154,13 @@ func TestWithFormField(t *testing.T) {
 
 // TestWithHeader tests header setter
 func TestWithHeader(t *testing.T) {
-	customHeaders := make(map[string][]string)
-	customHeaders["Authorization"] = []string{"Bearer token"}
-	customHeaders["X-Custom"] = []string{"value"}
+	customHeaders := http.Header{
+		"Authorization": []string{"Bearer token"},
+		"X-Custom":      []string{"value"},
+	}
 
 	payload := &RequestPayload{
-		headers: make(map[string][]string),
+		headers: make(http.Header),
 	}
 
 	setter := WithHeader(customHeaders)

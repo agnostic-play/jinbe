@@ -2,7 +2,7 @@ package cache_manager
 
 import (
 	"context"
-	`fmt`
+	"fmt"
 	"sync"
 
 	"golang.org/x/sync/singleflight"
@@ -48,11 +48,13 @@ func NewCacheManager(cfg Config, fn util.LoggerFn) CacheManager {
 
 	cm.log(context.Background(), fmt.Sprintf("config: %+v", cfg))
 
-	cm.wgDone.Add(1)
-	go func() {
-		defer cm.wgDone.Done()
-		cm.autoRefresh()
-	}()
+	if cm.cfg.RefreshPeriod > 0 {
+		cm.wgDone.Add(1)
+		go func() {
+			defer cm.wgDone.Done()
+			cm.autoRefresh()
+		}()
+	}
 
 	return cm
 }
@@ -63,5 +65,7 @@ func (cm *cacheManager) Stop() {
 }
 
 func (cm *cacheManager) GetAvailableCacheSlot() int {
+	cm.mu.RLock()
+	defer cm.mu.RUnlock()
 	return cm.cfg.CacheCapacity - len(cm.data)
 }
