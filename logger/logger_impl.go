@@ -65,5 +65,5 @@ func (z engine) SystemInfo(identifier string, fields ...zap.Field) {
 
 func (z engine) SystemFailure(identifier string, fields ...zap.Field) {
 	fields = append(fields, zap.String("_app_sys_message", identifier))
-	z.sys.Info(fmt.Sprintf("[SysErr] %s", identifier), fields...)
+	z.sys.Error(fmt.Sprintf("[SysErr] %s", identifier), fields...)
 }

@@ -45,10 +45,11 @@ func NewRestClient(clientID string, baseURL string, heimdalClient heimdall.Clien
 	}
 
 	return &restClient{
-		baseURL:  baseURL,
-		clientID: clientID,
-		client:   heimdalClient,
-		logger:   fnLogger,
+		baseURL:        baseURL,
+		clientID:       clientID,
+		client:         heimdalClient,
+		logger:         fnLogger,
+		defaultHeaders: make(http.Header),
 	}
 }
 
@@ -126,16 +127,20 @@ func (c *restClient) BeforeRequest(ctx context.Context, req *http.Request) {
 	)
 
 	if req.Body == nil {
-		c.logger(ctx, loggerIdentifier, zap.Error(fmt.Errorf("failed to read request body: request body is nil")))
+		// GET/DELETE requests have no body — log URL and headers only.
+		c.logger(ctx, loggerIdentifier,
+			zap.String("url", req.URL.String()),
+			zap.Any("headers", masking.ShouldMaskStruct(req.Header)),
+		)
 		return
 	}
 
 	bodyBytes, err := io.ReadAll(req.Body)
+	_ = req.Body.Close() // close the original body immediately after draining
 	if err != nil {
 		c.logger(ctx, loggerIdentifier, zap.Error(fmt.Errorf("failed to read request body: %w", err)))
 		return
 	}
-	defer req.Body.Close()
 
 	req.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
 
@@ -162,7 +167,7 @@ func (c *restClient) AfterResponse(ctx context.Context, requestTime time.Time, r
 
 	var (
 		body             any
-		loggerIdentifier = fmt.Sprintf("[RESPONSE] %s", c.clientID)
+		loggerIdentifier = fmt.Sprintf("[Response] %s", c.clientID)
 	)
 
 	if resp == nil {
@@ -176,11 +181,11 @@ func (c *restClient) AfterResponse(ctx context.Context, requestTime time.Time, r
 	}
 
 	bodyBytes, err := io.ReadAll(resp.Body)
+	_ = resp.Body.Close() // close the original body immediately after draining
 	if err != nil {
 		c.logger(ctx, loggerIdentifier, zap.Error(fmt.Errorf("failed to read response body: %w", err)))
 		return
 	}
-	defer resp.Body.Close()
 
 	resp.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
 

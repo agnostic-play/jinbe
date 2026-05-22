@@ -9,7 +9,10 @@ import (
 )
 
 func MaskStruct(target any) (any, error) {
-	maskedStruct, err := masker.Mask(target)
+	if target == nil {
+		return nil, nil
+	}
+	maskedStruct, err := getMasker().Mask(target)
 	if err != nil {
 		return target, err
 	}
@@ -23,11 +26,14 @@ func MaskJSON(target []byte) (any, error) {
 		return target, err
 	}
 
-	return masker.Mask(targetJson)
+	return getMasker().Mask(targetJson)
 }
 
 func ShouldMaskStruct(target any) any {
-	maskedStruct, err := masker.Mask(target)
+	if target == nil {
+		return nil
+	}
+	maskedStruct, err := getMasker().Mask(target)
 	if err != nil {
 		return target
 	}
@@ -41,7 +47,7 @@ func ShouldMaskJSON(target []byte) any {
 		return target
 	}
 
-	maskedStruct, err := masker.Mask(targetJson)
+	maskedStruct, err := getMasker().Mask(targetJson)
 	if err != nil {
 		return target
 	}
@@ -50,7 +56,10 @@ func ShouldMaskJSON(target []byte) any {
 }
 
 func ShouldMaskStructWithLogger(ctx context.Context, log logger.PublicLoggerWithoutParamsFn, target any) any {
-	maskedStruct, err := masker.Mask(target)
+	if target == nil {
+		return nil
+	}
+	maskedStruct, err := getMasker().Mask(target)
 	if err != nil {
 		log(ctx, fmt.Sprintf("failed to mask: %s", err.Error()))
 		return target
@@ -61,15 +70,15 @@ func ShouldMaskStructWithLogger(ctx context.Context, log logger.PublicLoggerWith
 
 func ShouldMaskJSONWithLogger(ctx context.Context, log logger.PublicLoggerWithoutParamsFn, target []byte) any {
 	var targetJson any
-	if err := json.Unmarshal([]byte(target), &targetJson); err != nil {
+	if err := json.Unmarshal(target, &targetJson); err != nil {
 		log(ctx, fmt.Sprintf("failed to mask: %s", err.Error()))
 		return target
 	}
 
-	maskedStruct, err := masker.Mask(targetJson)
+	maskedStruct, err := getMasker().Mask(targetJson)
 	if err != nil {
 		log(ctx, fmt.Sprintf("failed to mask: %s", err.Error()))
-		return nil
+		return targetJson
 	}
 
 	return maskedStruct

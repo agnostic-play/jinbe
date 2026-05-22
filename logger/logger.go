@@ -9,12 +9,12 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
-var (
-	registry atomic.Value
-)
+var registry atomic.Value
 
 type wrapper struct {
-	engine Logger
+	engine   Logger
+	tdrLevel zap.AtomicLevel
+	sysLevel zap.AtomicLevel
 }
 
 type Logger interface {
@@ -33,7 +33,7 @@ type PublicLoggerFn func(ctx context.Context, identifier string, objects ...zap.
 type PublicLoggerWithoutParamsFn func(ctx context.Context, identifier string)
 
 func NewLogger(logLevel zapcore.Level) {
-	tdrLog, err := NewZapLogger(Config{
+	tdrLog, tdrLevel, err := NewZapLogger(Config{
 		LogType:      TDRLog,
 		LogLevel:     logLevel,
 		SkipCaller:   2,
@@ -44,7 +44,7 @@ func NewLogger(logLevel zapcore.Level) {
 		log.Fatal(err)
 	}
 
-	sysLog, err := NewZapLogger(Config{
+	sysLog, sysLevel, err := NewZapLogger(Config{
 		LogType:      SYSLog,
 		LogLevel:     logLevel,
 		SkipCaller:   2,
@@ -52,20 +52,47 @@ func NewLogger(logLevel zapcore.Level) {
 		EnableStdout: true,
 	})
 	if err != nil {
-		log.Fatalf("sysLog failed to initialize zap logger TDR: %v", err)
+		log.Fatalf("sysLog failed to initialize zap logger: %v", err)
 	}
 
-	registry.Store(wrapper{&engine{
-		tdr: tdrLog,
-		sys: sysLog,
-	}})
+	registry.Store(wrapper{
+		engine:   &engine{tdr: tdrLog, sys: sysLog},
+		tdrLevel: tdrLevel,
+		sysLevel: sysLevel,
+	})
 }
 
-func caller() Logger {
-	wrapper, valid := registry.Load().(wrapper)
+// OverrideLogLevelTo changes the log level for both TDR and SYS loggers at runtime
+// without restarting the service.
+func OverrideLogLevelTo(level zapcore.Level) {
+	w, valid := registry.Load().(wrapper)
 	if !valid {
-		log.Fatal("invalid log")
+		return
 	}
-
-	return wrapper.engine
+	log.Printf("overriding log level to %s", level.String())
+	w.tdrLevel.SetLevel(level)
+	w.sysLevel.SetLevel(level)
 }
+
+// caller returns the active Logger. If NewLogger has not been called yet,
+// it returns a no-op logger rather than crashing the process.
+func caller() Logger {
+	w, valid := registry.Load().(wrapper)
+	if !valid {
+		return noopLogger{}
+	}
+	return w.engine
+}
+
+// noopLogger silently drops all log calls. It is returned when the registry
+// is not initialized, so library consumers don't crash on early log calls.
+type noopLogger struct{}
+
+func (noopLogger) TDR(_ context.Context, _ string, _ ...zap.Field)             {}
+func (noopLogger) Info(_ context.Context, _ string, _ ...zap.Field)            {}
+func (noopLogger) Warn(_ context.Context, _ string, _ ...zap.Field)            {}
+func (noopLogger) Err(_ context.Context, _ string, _ ...zap.Field)             {}
+func (noopLogger) Debug(_ context.Context, _ string, _ ...zap.Field)           {}
+func (noopLogger) ThirdPartyLogger(_ context.Context, _ string, _ ...zap.Field) {}
+func (noopLogger) SystemFailure(_ string, _ ...zap.Field)                       {}
+func (noopLogger) SystemInfo(_ string, _ ...zap.Field)                          {}

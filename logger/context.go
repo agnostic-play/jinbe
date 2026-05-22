@@ -23,7 +23,7 @@ func NewLoggerCtx(ctx context.Context, traceID string) (context.Context, Ctx) {
 		TraceID: traceID,
 	}
 
-	ctx = context.WithValue(ctx, AppLoggerCtx, loggerCtx)
+	ctx = context.WithValue(ctx, AppLoggerCtx, &loggerCtx)
 
 	return ctx, loggerCtx
 }
