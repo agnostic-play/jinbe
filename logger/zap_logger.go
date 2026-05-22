@@ -2,7 +2,6 @@ package logger
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"path/filepath"
 	"time"
@@ -18,29 +17,26 @@ const (
 	filePermission = 0755
 )
 
-// loggerLevel defines the logger's log level and can be updated at runtime
-// without restarting the service.
-var loggerLevel zap.AtomicLevel
-
 // Config defines logger configuration.
 type Config struct {
 	LogType      string
 	LogLevel     zapcore.Level
 	SkipCaller   int
-	EnableFile   bool // Enable/disable file logging
-	EnableStdout bool // Enable/disable stdout logging
+	EnableFile   bool
+	EnableStdout bool
 }
 
 // NewZapLogger creates a new zap.Logger with daily log rotation.
-func NewZapLogger(cfg Config) (*zap.Logger, error) {
-	loggerLevel = zap.NewAtomicLevelAt(cfg.LogLevel)
+// It returns both the logger and its AtomicLevel so the caller can adjust the level at runtime.
+func NewZapLogger(cfg Config) (*zap.Logger, zap.AtomicLevel, error) {
+	level := zap.NewAtomicLevelAt(cfg.LogLevel)
 
 	if cfg.LogType != TDRLog && cfg.LogType != SYSLog {
-		return nil, fmt.Errorf("invalid log type %q: must be %s or %s", cfg.LogType, TDRLog, SYSLog)
+		return nil, level, fmt.Errorf("invalid log type %q: must be %s or %s", cfg.LogType, TDRLog, SYSLog)
 	}
 
 	if !cfg.EnableFile && !cfg.EnableStdout {
-		return nil, fmt.Errorf("at least one output (file or stdout) must be enabled")
+		return nil, level, fmt.Errorf("at least one output (file or stdout) must be enabled")
 	}
 
 	encoderCfg := zapcore.EncoderConfig{
@@ -77,7 +73,7 @@ func NewZapLogger(cfg Config) (*zap.Logger, error) {
 	core := zapcore.NewCore(
 		zapcore.NewJSONEncoder(encoderCfg),
 		writeSyncer,
-		loggerLevel,
+		level,
 	)
 
 	logger := zap.New(
@@ -87,10 +83,5 @@ func NewZapLogger(cfg Config) (*zap.Logger, error) {
 		zap.AddStacktrace(zap.ErrorLevel),
 	)
 
-	return logger, nil
-}
-
-func OverrideLogLevelTo(level zapcore.Level) {
-	log.Printf("overriding log level from %s to %s", loggerLevel, level.String())
-	loggerLevel.SetLevel(level)
+	return logger, level, nil
 }

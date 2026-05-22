@@ -35,8 +35,15 @@ func (cm *cacheManager) Set(ctx context.Context, fetcherFn FetcherFn, key string
 
 	now := time.Now()
 	nowNano := now.UnixNano()
-	staleAt := nowNano + cm.cfg.StaleInSec.Nanoseconds()
-	destroyAt := nowNano + cm.cfg.MaxAgeInSec.Nanoseconds()
+
+	// Only compute timestamps when the feature is enabled; zero means "never".
+	var staleAt, destroyAt int64
+	if cm.cfg.StaleInSec > 0 {
+		staleAt = nowNano + cm.cfg.StaleInSec.Nanoseconds()
+	}
+	if cm.cfg.MaxAgeInSec > 0 {
+		destroyAt = nowNano + cm.cfg.MaxAgeInSec.Nanoseconds()
+	}
 
 	cm.mu.Lock()
 	defer cm.mu.Unlock()
@@ -194,11 +201,11 @@ func (cm *cacheManager) refreshOne(key string) {
 func (cm *cacheManager) fetchWithRetry(ctx context.Context, fn FetcherFn, key string) (any, error) {
 	backoff := cm.cfg.RetryBackoff
 	maxBackoff := cm.cfg.MaxRetryBackoff
+	var lastErr error
 
 	for attempt := 0; attempt <= cm.cfg.MaxRetries; attempt++ {
-		cm.log(ctx, fmt.Sprintf("fetch data %s attempt #%d", key, attempt))
+		cm.log(ctx, fmt.Sprintf("fetch data %s attempt #%d", key, attempt+1))
 		if attempt > 0 {
-			// apply delay on second attempts
 			backoff = time.Duration(float64(backoff) * (1.5 + 0.5*math.Min(1, float64(attempt)/3)))
 			if backoff > maxBackoff {
 				backoff = maxBackoff
@@ -209,7 +216,6 @@ func (cm *cacheManager) fetchWithRetry(ctx context.Context, fn FetcherFn, key st
 			case <-ctx.Done():
 				return nil, ctx.Err()
 			}
-
 		}
 
 		fetchCtx, cancel := context.WithTimeout(ctx, cm.cfg.FetcherTimeout)
@@ -222,9 +228,10 @@ func (cm *cacheManager) fetchWithRetry(ctx context.Context, fn FetcherFn, key st
 		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 			return nil, err
 		}
+		lastErr = err
 	}
 
-	return nil, fmt.Errorf("fetch failed after %d retries", cm.cfg.MaxRetries)
+	return nil, fmt.Errorf("fetch failed after %d retries: %w", cm.cfg.MaxRetries, lastErr)
 }
 
 func (cm *cacheManager) log(ctx context.Context, msg string) {

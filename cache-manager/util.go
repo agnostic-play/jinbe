@@ -3,7 +3,8 @@ package cache_manager
 import (
 	"errors"
 	"fmt"
-	"math/rand/v2"
+
+	"github.com/google/uuid"
 )
 
 // ParseCacheToStruct tries to extract a *T from a cached any value.
@@ -29,5 +30,5 @@ func ParseCacheToStruct[T any](cacheVal any) (*T, error) {
 }
 
 func randomID() string {
-	return fmt.Sprintf("%07d", rand.IntN(10000000))
+	return uuid.New().String()
 }

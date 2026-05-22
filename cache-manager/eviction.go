@@ -30,7 +30,8 @@ func (cm *cacheManager) evictIfNeededLocked() {
 	}
 
 	candidates := cm.collectEvictionCandidates(plan.triggerSize)
-	if len(candidates) < plan.triggerSize {
+	if len(candidates) == 0 {
+		// All entries are expired; autoRefresh will clean them shortly.
 		return
 	}
 

@@ -67,5 +67,9 @@ func (cm *cacheManager) Stop() {
 func (cm *cacheManager) GetAvailableCacheSlot() int {
 	cm.mu.RLock()
 	defer cm.mu.RUnlock()
-	return cm.cfg.CacheCapacity - len(cm.data)
+	available := cm.cfg.CacheCapacity - len(cm.data)
+	if available < 0 {
+		return 0
+	}
+	return available
 }

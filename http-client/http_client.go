@@ -136,11 +136,11 @@ func (c *restClient) BeforeRequest(ctx context.Context, req *http.Request) {
 	}
 
 	bodyBytes, err := io.ReadAll(req.Body)
+	_ = req.Body.Close() // close the original body immediately after draining
 	if err != nil {
 		c.logger(ctx, loggerIdentifier, zap.Error(fmt.Errorf("failed to read request body: %w", err)))
 		return
 	}
-	defer req.Body.Close()
 
 	req.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
 
@@ -181,11 +181,11 @@ func (c *restClient) AfterResponse(ctx context.Context, requestTime time.Time, r
 	}
 
 	bodyBytes, err := io.ReadAll(resp.Body)
+	_ = resp.Body.Close() // close the original body immediately after draining
 	if err != nil {
 		c.logger(ctx, loggerIdentifier, zap.Error(fmt.Errorf("failed to read response body: %w", err)))
 		return
 	}
-	defer resp.Body.Close()
 
 	resp.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
 
